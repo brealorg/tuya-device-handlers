@@ -41,7 +41,7 @@ def test_heater_exposes_off_hvac_mode(
 
     definition = get_climate_definition(device, TuyaUnitOfTemperature.CELSIUS)
     assert definition.hvac_mode_wrapper is not None
-    assert definition.hvac_mode_wrapper.options == []
+    assert definition.hvac_mode_wrapper.options == [TuyaClimateHVACMode.HEAT]
     assert definition.preset_wrapper is not None
     assert definition.preset_wrapper.options == ["eco"]
 
@@ -49,6 +49,9 @@ def test_heater_exposes_off_hvac_mode(
 
     definition = get_climate_definition(device, TuyaUnitOfTemperature.CELSIUS)
     assert definition.hvac_mode_wrapper is not None
-    assert definition.hvac_mode_wrapper.options == [TuyaClimateHVACMode.OFF]
+    assert definition.hvac_mode_wrapper.options == [
+        TuyaClimateHVACMode.OFF,
+        TuyaClimateHVACMode.HEAT,
+    ]
     assert definition.preset_wrapper is not None
     assert definition.preset_wrapper.options == ["eco"]

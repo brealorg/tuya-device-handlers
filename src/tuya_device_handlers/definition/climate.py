@@ -28,6 +28,18 @@ from tuya_device_handlers.helpers.homeassistant import (
 
 from .base import BaseEntityQuirk
 
+# HVAC mode reported while the device runs a preset, per device category.
+# Mirrors `switch_only_hvac_mode` in the Home Assistant Tuya climate platform.
+_PRESET_HVAC_MODE = {
+    "dbl": TuyaClimateHVACMode.HEAT,
+    "kt": TuyaClimateHVACMode.COOL,
+    "mjj": TuyaClimateHVACMode.HEAT,
+    "qn": TuyaClimateHVACMode.HEAT,
+    "rs": TuyaClimateHVACMode.HEAT,
+    "wk": TuyaClimateHVACMode.HEAT_COOL,
+    "wkf": TuyaClimateHVACMode.HEAT,
+}
+
 
 @dataclass(kw_only=True)
 class ClimateDefinition:
@@ -195,7 +207,10 @@ def get_default_definition(
             prefer_function=True,
         ),
         hvac_mode_wrapper=DefaultHVACModeWrapper.find_dpcode(
-            device, "mode", prefer_function=True
+            device,
+            "mode",
+            prefer_function=True,
+            preset_hvac_mode=_PRESET_HVAC_MODE.get(device.category),
         ),
         preset_wrapper=DefaultPresetModeWrapper.find_dpcode(
             device, "mode", prefer_function=True

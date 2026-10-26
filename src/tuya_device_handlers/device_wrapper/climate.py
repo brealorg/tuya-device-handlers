@@ -157,8 +157,15 @@ class DefaultHVACModeWrapper(DPCodeEnumWrapper[TuyaClimateHVACMode]):
     # Modes that do not map to HVAC modes are ignored
     # (they are handled by PresetWrapper)
 
+    # When a preset_hvac_mode is given, preset values (modes that do not map
+    # to an HVAC mode) are reported as that HVAC mode instead of None
+
     def __init__(
-        self, dpcode: str, type_information: EnumTypeInformation
+        self,
+        dpcode: str,
+        type_information: EnumTypeInformation,
+        *,
+        preset_hvac_mode: TuyaClimateHVACMode | None = None,
     ) -> None:
         """Init DefaultHVACModeWrapper."""
         super().__init__(dpcode, type_information)
@@ -168,16 +175,49 @@ class DefaultHVACModeWrapper(DPCodeEnumWrapper[TuyaClimateHVACMode]):
             for ha_mode in self._mappings.values()
             if ha_mode is not None
         ]
+        self._presets = [
+            tuya_mode
+            for tuya_mode, ha_mode in self._mappings.items()
+            if ha_mode is None
+            and tuya_mode not in _DEFAULT_DEVICE_MODE_TO_HVACMODE
+        ]
+        self._preset_hvac_mode = preset_hvac_mode if self._presets else None
+        if (
+            self._preset_hvac_mode is not None
+            and self._preset_hvac_mode not in self.options
+        ):
+            self.options.append(self._preset_hvac_mode)
+
+    @classmethod
+    def find_dpcode(
+        cls,
+        device: CustomerDevice,
+        dpcodes: str | tuple[str, ...] | None,
+        *,
+        prefer_function: bool = False,
+        preset_hvac_mode: TuyaClimateHVACMode | None = None,
+    ) -> Self | None:
+        """Find a DefaultHVACModeWrapper for the given DP codes."""
+        if type_information := cls._DPTYPE.find_dpcode(
+            device, dpcodes, prefer_function=prefer_function
+        ):
+            return cls(
+                dpcode=type_information.dpcode,
+                type_information=type_information,
+                preset_hvac_mode=preset_hvac_mode,
+            )
+        return None
 
     def read_device_status(
         self, device: CustomerDevice
     ) -> TuyaClimateHVACMode | None:
         """Read the device status."""
-        if (
-            raw := self._read_dpcode_value(device)
-        ) not in _DEFAULT_DEVICE_MODE_TO_HVACMODE:
-            return None
-        return _DEFAULT_DEVICE_MODE_TO_HVACMODE[raw]
+        raw = self._read_dpcode_value(device)
+        if raw in _DEFAULT_DEVICE_MODE_TO_HVACMODE:
+            return _DEFAULT_DEVICE_MODE_TO_HVACMODE[raw]
+        if raw in self._presets:
+            return self._preset_hvac_mode
+        return None
 
     def _convert_value_to_raw_value(
         self,
@@ -185,11 +225,14 @@ class DefaultHVACModeWrapper(DPCodeEnumWrapper[TuyaClimateHVACMode]):
         value: TuyaClimateHVACMode,
     ) -> Any:
         """Convert value to raw value."""
-        return next(
-            tuya_mode
-            for tuya_mode, ha_mode in self._mappings.items()
-            if ha_mode == value
-        )
+        for tuya_mode, ha_mode in self._mappings.items():
+            if ha_mode == value:
+                return tuya_mode
+        # Only reached for the preset HVAC mode: keep the active mode if it
+        # already matches, otherwise switch to the first preset
+        if self.read_device_status(device) == value:
+            return self._read_dpcode_value(device)
+        return self._presets[0]
 
 
 class DefaultPresetModeWrapper(DPCodeEnumWrapper):
